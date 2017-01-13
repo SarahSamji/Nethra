@@ -1,0 +1,252 @@
+
+//Database creation class
+package com.example.dictator.blind;
+
+/**
+ * Created by dictator on 2/1/16.
+ */
+
+import android.content.Context;
+import android.database.Cursor;
+import android.database.SQLException;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
+import android.database.sqlite.SQLiteException;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+public class DataBaseHelper extends SQLiteOpenHelper{
+
+    //The Android's default system path of your application database.
+    private static String DB_PATH = "/data/data/com.example.dictator.blind/databases/";
+
+    private static String DB_NAME = "BeaconDB.db";
+
+    private SQLiteDatabase myDataBase;
+
+    private final Context myContext;
+
+    /**
+     * Constructor
+     * Takes and keeps a reference of the passed context in order to access to the application assets and resources.
+     * @param context
+     */
+    public DataBaseHelper(Context context) {
+
+        super(context, DB_NAME, null, 1);
+        this.myContext = context;
+    }
+
+    /**
+     * Creates a empty database on the system and rewrites it with your own database.
+     * */
+    public void createDataBase() throws IOException{
+
+        boolean dbExist = checkDataBase();
+
+        if(dbExist){
+            //do nothing - database already exist
+        }else{
+
+            //By calling this method and empty database will be created into the default system path
+            //of your application so we are gonna be able to overwrite that database with our database.
+            this.getReadableDatabase();
+
+            try {
+
+                copyDataBase();
+
+            } catch (IOException e) {
+
+                throw new Error("Error copying database");
+
+            }
+        }
+
+    }
+
+    /**
+     * Check if the database already exist to avoid re-copying the file each time you open the application.
+     * @return true if it exists, false if it doesn't
+     */
+    private boolean checkDataBase(){
+
+        SQLiteDatabase checkDB = null;
+
+        try{
+            String myPath = DB_PATH + DB_NAME;
+            checkDB = SQLiteDatabase.openDatabase(myPath, null, SQLiteDatabase.OPEN_READONLY);
+
+        }catch(SQLiteException e){
+
+            //database does't exist yet.
+
+        }
+
+        if(checkDB != null){
+
+            checkDB.close();
+
+        }
+
+        return checkDB != null ? true : false;
+    }
+
+    /**
+     * Copies your database from your local assets-folder to the just created empty database in the
+     * system folder, from where it can be accessed and handled.
+     * This is done by transfering bytestream.
+     * */
+    private void copyDataBase() throws IOException{
+
+        //Open your local db as the input stream
+        InputStream myInput = myContext.getAssets().open(DB_NAME);
+
+        // Path to the just created empty db
+        String outFileName = DB_PATH + DB_NAME;
+
+        //Open the empty db as the output stream
+        OutputStream myOutput = new FileOutputStream(outFileName);
+
+        //transfer bytes from the inputfile to the outputfile
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = myInput.read(buffer))>0){
+            myOutput.write(buffer, 0, length);
+        }
+
+        //Close the streams
+        myOutput.flush();
+        myOutput.close();
+        myInput.close();
+
+    }
+
+    public void openDataBase() throws SQLException{
+
+        //Open the database
+        String myPath = DB_PATH + DB_NAME;
+        myDataBase = SQLiteDatabase.openDatabase(myPath, null, SQLiteDatabase.OPEN_READWRITE);
+
+    }
+    public String executeQuery(){
+        Cursor c = myDataBase.rawQuery("select Direction from Cost", null);
+        c.moveToFirst();
+        String direction = c.getString(0);
+        c.close();
+        return direction;
+
+    }
+    public Cursor allLocation(){
+        Cursor c = myDataBase.rawQuery("select Location from Beacon_Location", null);
+        c.moveToFirst();
+        //String direction = c.getString(0);
+        return c;
+    }
+    public int noOfLocations(){
+        Cursor c = myDataBase.rawQuery("select count(*) from Beacon_Location",null);
+        c.moveToFirst();
+        int n=c.getInt(0);
+        c.close();
+        return n;
+    }
+    public int noOfEdgesOfNode(int num){
+        Cursor c = myDataBase.rawQuery("select count(*) from adjacent where B_id1="+num+" OR B_id2="+num+" ", null);
+        c.moveToFirst();
+        int n = c.getInt(0);
+        c.close();
+        return n;
+    }
+    public Cursor adjacentToNode1(int num){
+        Cursor c=myDataBase.rawQuery("select B_id2 from adjacent where B_id1="+num+" ",null);
+        c.moveToFirst();
+        return c;
+    }
+    public Cursor adjacentToNode2(int num){
+        Cursor c= myDataBase.rawQuery("select B_id1 from adjacent where B_id2="+num+" ",null);
+        c.moveToFirst();
+        return c;
+    }
+    public int executeQuery7(int num){
+        Cursor c = myDataBase.rawQuery("select Weight from Cost where A_id1="+num+" ", null);
+        c.moveToFirst();
+        int n = c.getInt(0);
+        c.close();
+        return n;
+    }
+    public int getBid(String address){
+        int n;
+        Cursor c = myDataBase.rawQuery("select B_id from Beacon_Addr where Mac_id=\""+address+"\" ", null);
+        if(c.getCount()==0)
+            return 0;
+        c.moveToFirst();
+        n = c.getInt(0);
+        c.close();
+        return n;
+    }
+    public int getBeaconid(String des){
+        Cursor c = myDataBase.rawQuery("select B_id from Beacon_Location where Location=\""+des+"\" ", null);
+        c.moveToFirst();
+        int n = c.getInt(0);
+        c.close();
+        return n;
+    }
+    public String direction(String des, String src){
+        Cursor c = null;
+        String s;
+        /*
+        c = myDataBase.rawQuery("select Direction from Cost where A_id= (select A_id from Adjacent where " +
+                "(B_id1=(select B_id from Beacon_Addr where Mac_id=\""+src+"\")or B_id2=(select B_id from Beacon_Addr where Mac_id=\""+src+
+                "\")) and (B_id1=(select B_id from Beacon_Location where Location=\""+des+"\")or B_id2=(select B_id from Beacon_Location where Location=\""+des+"\")))",null);
+        */
+        c=myDataBase.rawQuery("select Direction from Cost where A_id= (select A_id from Adjacent where " +
+                "(B_id1=(select B_id from Beacon_Addr where Mac_id=\""+src+"\")) and (B_id2=(select B_id from Beacon_Location where Location=\""+des+"\")))",null);
+        /*
+        c = myDataBase.rawQuery("select Direction from Cost where A_id= (select A_id from Adjacent where " +
+                "(B_id1 or B_id2=(select B_id from Beacon_Addr where Mac_id=\""+src+"\")) and (B_id1 or B_id2=(select B_id from Beacon_Location where Location=\""+des+"\")))",null);
+        */
+        if(c.getCount()==0) {
+            c.close();
+            return "null";
+        }
+        c.moveToFirst();
+        s = c.getString(0);
+        c.close();
+        return s;
+    }
+    public void delete(){
+        boolean dbExist = checkDataBase();
+        if (dbExist) {
+            myContext.deleteDatabase("BeaconDB.db");
+        }else{
+            //do nothing
+        }
+    }
+    @Override
+    public synchronized void close() {
+
+        if(myDataBase != null)
+            myDataBase.close();
+
+        super.close();
+
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        myContext.deleteDatabase("BeaconDB.db");
+    }
+
+    // Add your public helper methods to access and get content from the database.
+    // You could return cursors by doing "return myDataBase.query(....)" so it'd be easy
+    // to you to create adapters for your views.
+
+}

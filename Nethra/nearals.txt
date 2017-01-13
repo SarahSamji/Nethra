@@ -1,0 +1,110 @@
+package com.rabitech.nearals;
+
+
+
+import java.util.ArrayList;
+import com.rabitech.nearals.datatypes.Nearal;
+import com.rabitech.nearals.datatypes.NearalList;
+import com.rabitech.nearals.interfaces.NearalsBeaconListener;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+
+/**
+ * Created by fhd@Rabitech on 2/12/15.
+ */
+
+public class NearalsReciver 
+{
+	private Context mContext;
+	private IntentFilter inf;
+	
+	
+
+	static final String ACTTION_Brodcast_ON_Nearal = "com.rabitech.nearals.On_Nearal";
+	static final String ACTTION_Brodcast_ON_Nearest_Nearal = "com.rabitech.nearals.On_Nearest_Nearal";
+	
+	NearalsBeaconListener nearalsBeaconListener;
+	protected ArrayList<Nearal> nearalArrayList;
+	
+	public void setOnNearalsBeaconListener(NearalsBeaconListener nearalsBeaconListener)
+	{
+			this.nearalsBeaconListener=nearalsBeaconListener;			
+	}
+	
+	
+	 
+
+	public NearalsReciver(Context context) 
+	{
+		this.mContext=context;
+	}
+	
+	
+	 
+	 public void registerNearalsBrodcastReciever() 
+	 {
+		 addBrodcastReciever(NearalsReciver.ACTTION_Brodcast_ON_Nearal,br_OnNearals)  ;      	      
+	 
+		 addBrodcastReciever(NearalsReciver.ACTTION_Brodcast_ON_Nearest_Nearal,br_OnNearestNearal);      
+	     
+	 }
+	 
+	 private void addBrodcastReciever(String acttion, BroadcastReceiver br) 
+	 {
+	        inf = new IntentFilter();
+	        inf.addAction(acttion);
+	        mContext.registerReceiver(br,inf);
+
+	 }
+	 
+	 public void unRegisterNearalsBrodcastReciever() 
+	 {
+		 removeBrodcastReciever(br_OnNearals)  ;      	      
+	 
+		 removeBrodcastReciever(br_OnNearestNearal);     
+	 }
+	 
+	 private void removeBrodcastReciever(BroadcastReceiver brReceiver) {
+			mContext.unregisterReceiver(brReceiver);
+		}	 
+	 
+	 
+	 private BroadcastReceiver br_OnNearals =new BroadcastReceiver()
+	 {
+		
+
+		@Override
+		 public void onReceive(Context context, Intent intent) {
+			 Nearal[] nearal = (Nearal[]) intent.getSerializableExtra(NearalService.KEY_NearalData);
+			 nearalsBeaconListener.OnNearalDetected(nearal[0]);
+			 if(nearalArrayList==null)
+				 nearalArrayList=new ArrayList<Nearal>();
+			 else
+			 {
+				 nearalArrayList.add(nearal[0]);
+			 }
+		}
+	 };
+	 
+	 
+	 private BroadcastReceiver br_OnNearestNearal =new BroadcastReceiver()
+	 {
+		 @Override
+		 public void onReceive(Context context, Intent intent) 
+		 {
+			 NearalList nearalsList=new NearalList(nearalArrayList);
+			 nearalsBeaconListener.OnNearalList(nearalsList);
+			  if (nearalArrayList != null)
+			 	nearalArrayList.clear();
+			 
+			 Nearal[] nearestNearal = (Nearal[]) intent.getSerializableExtra(NearalService.KEY_NearestNearalData);
+			 nearalsBeaconListener.OnNearestNearal(nearestNearal[0]);
+		}
+	 };
+	 
+	 
+	
+	 
+}

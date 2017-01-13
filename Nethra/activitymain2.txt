@@ -1,0 +1,308 @@
+package com.example.dictator.blind;
+
+import android.bluetooth.BluetoothAdapter;
+import android.content.Intent;
+import android.database.Cursor;
+import android.database.SQLException;
+import android.gesture.Gesture;
+import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
+import android.support.v4.view.GestureDetectorCompat;
+import android.support.v7.app.ActionBarActivity;
+import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.util.Log;
+import android.view.GestureDetector;
+import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.speech.tts.TextToSpeech;
+import android.widget.Toast;
+
+import com.rabitech.nearals.NearalService;
+import com.rabitech.nearals.NearalsReciver;
+import com.rabitech.nearals.datatypes.Nearal;
+import com.rabitech.nearals.datatypes.NearalList;
+import com.rabitech.nearals.interfaces.NearalsBeaconListener;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.PriorityQueue;
+
+public class Main2Activity extends  ActionBarActivity implements SensorEventListener, NearalsBeaconListener,GestureDetector.OnGestureListener,
+        GestureDetector.OnDoubleTapListener  {
+    public String destn,addr1=null,addr2=null;
+    static String destnt;
+    public NearalsReciver reciver;
+    float degree;
+    public TextToSpeech t1;
+    public  DataBaseHelper myDbHelper;
+    public Dijkstra dijkstra;
+    private GestureDetectorCompat mDetector;
+    // define the display assembly compass picture
+    // private ImageView image;
+
+    // record the compass picture angle turned
+    private float currentDegree = 0f;
+
+    // device sensor manager
+    private SensorManager mSensorManager;
+
+    TextView tvHeading;
+    TextView showDir;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main2);
+        mDetector = new GestureDetectorCompat(this,this);
+        // Set the gesture detector as the double tap
+        // listener.
+        mDetector.setOnDoubleTapListener(this);
+
+        t1 = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status != TextToSpeech.ERROR) {
+                    t1.setLanguage(Locale.ENGLISH);
+                }
+            }
+        });
+
+
+        // TextView that will tell the user what degree is he heading
+        tvHeading = (TextView) findViewById(R.id.tvHeading);
+        showDir = (TextView) findViewById(R.id.showDir);
+
+        // initialize your android device sensor capabilities
+        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
+
+
+        Intent serviceIntent = new Intent(this, NearalService.class);
+        try {
+            startService(serviceIntent);
+        }catch (Exception e){
+            e.printStackTrace();
+            Toast.makeText(getApplicationContext(),e.getMessage(),Toast.LENGTH_LONG).show();
+        }
+        //Get the bundle
+        Bundle bundle = getIntent().getExtras();
+        //Extract the data…
+        destn = bundle.getString("stuff");
+        destnt=destn;
+        Log.d("kuttan","Destination  "+destn);
+        reciver = new NearalsReciver(Main2Activity.this);
+        reciver.setOnNearalsBeaconListener(this);
+        DBOpener();
+        //dijkstra.shortestPath(destn);
+    }
+    @Override
+    public void onStart(){
+        super.onStart();
+        t1 = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status != TextToSpeech.ERROR) {
+                    t1.setLanguage(Locale.ENGLISH);
+                }
+            }
+        });
+        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        mBluetoothAdapter.enable();
+        reciver.registerNearalsBrodcastReciever();
+
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // for the system's orientation sensor registered listeners
+        mSensorManager.registerListener((SensorEventListener) this, mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),
+                SensorManager.SENSOR_DELAY_GAME);
+        reciver.registerNearalsBrodcastReciever();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+
+        // to stop the listener and save battery
+        mSensorManager.unregisterListener(this);
+        reciver.unRegisterNearalsBrodcastReciever();
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+
+        int n=0;
+        // get the angle around the z-axis rotated
+        degree = Math.round(event.values[0]);
+        tvHeading.setText("Heading: " + Float.toString(degree) + " degrees");
+        String[] dir = { "left", "back", "right", "straight" };
+
+        Log.d("destnt",destnt);
+        if(addr1!=null)
+            Log.d("addr1",addr1);
+        //assert addr1 != null;
+        if(addr1!=null) {
+            if (!addr1.equals(addr2) && addr1 != null) {
+                addr2 = addr1;
+                if (addr2 != null && addr1 != null) {
+                    String direction = myDbHelper.direction(destnt, addr1);
+                    Log.d("direction", direction);
+                    if (direction.equals("left"))
+                        n = 0;
+                    else if (direction.equals("back"))
+                        n = 1;
+                    else if (direction.equals("right"))
+                        n = 2;
+                    else if (direction.equals("straight"))
+                        n = 3;
+                    if (!direction.equals("null")) {
+                        if (degree >= 45 && degree < 135) {
+                            n = (n + 1) % 4;
+                            showDir.setText("Go " + dir[n]);
+                            //t1.speak(dir[n], TextToSpeech.QUEUE_FLUSH, null);
+                        } else if (degree >= 135 && degree < 225) {
+                            n = (n + 2) % 4;
+                            showDir.setText("Go " + dir[n]);
+                            // t1.speak(dir[n], TextToSpeech.QUEUE_FLUSH, null);
+                        } else if (degree >= 225 && degree < 315) {
+                            n = (n + 3) % 4;
+                            showDir.setText("Go " + dir[n]);
+                            // t1.speak(dir[n], TextToSpeech.QUEUE_FLUSH, null);
+                        } else {
+                            n = (n + 4) % 4;
+                            showDir.setText("Go " + dir[n]);
+                            // t1.speak(dir[n], TextToSpeech.QUEUE_FLUSH, null);
+                        }
+                    }
+                    if (!direction.equals("null"))
+                        t1.speak("Go" + dir[n], TextToSpeech.QUEUE_FLUSH, null);
+                }
+
+            }
+        }
+
+    }
+
+
+
+
+    public void DBOpener(){
+        myDbHelper = new DataBaseHelper(this);
+        try {
+
+            myDbHelper.openDataBase();
+
+        }catch(SQLException sqle){
+
+            throw sqle;
+
+        }
+
+    }
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // not in use
+    }
+    //overriden beacon methods
+    @Override
+    public void OnNearalDetected(Nearal nearal) {
+    }
+
+    @Override
+    public void OnNearestNearal(Nearal nearal) {
+        try {
+            int nullcheck;
+            System.out.println("On Nearest" + nearal.getAddress() + " at rssi : " + nearal.getRssi());
+
+            nullcheck = myDbHelper.getBid(nearal.getAddress());
+            if (nullcheck != 0) {
+                if (addr1 != nearal.getAddress()) {
+                    if (myDbHelper.getBeaconid(destnt) == myDbHelper.getBid(nearal.getAddress())) {
+                        t1.speak("You have reached your Destination", TextToSpeech.QUEUE_FLUSH, null);
+                        addr1=nearal.getAddress();
+                        finish();
+                    } else {
+                        addr1 = nearal.getAddress();
+                        dijkstra.shortestPath(destn, nearal.getAddress());
+                    }
+                }
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    @Override
+    public void OnNearalList(NearalList nearalList) {
+
+    }
+    @Override
+    public boolean onTouchEvent(MotionEvent e){
+        this.mDetector.onTouchEvent(e);
+        // Be sure to call the superclass implementation
+        return super.onTouchEvent(e);
+    }
+
+
+    @Override
+    public boolean onSingleTapConfirmed(MotionEvent e) {
+        return true;
+    }
+
+    @Override
+    public boolean onDoubleTap(MotionEvent e) {
+        addr2="XXX";
+        Log.d("Gestures","doubledmain2" + e.toString());
+        return true;
+    }
+
+    @Override
+    public boolean onDoubleTapEvent(MotionEvent e) {
+        return true;
+    }
+
+    @Override
+    public boolean onDown(MotionEvent e) {
+        return true;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent e) {
+
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        return true;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        return true;
+    }
+
+    @Override
+    public void onLongPress(MotionEvent e) {
+
+    }
+
+    @Override
+    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+        finish();
+        return true;
+    }
+}

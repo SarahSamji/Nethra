@@ -1,0 +1,169 @@
+package com.example.dictator.blind;
+
+import android.database.Cursor;
+import android.util.Log;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.PriorityQueue;
+
+/**
+ * Created by dictator on 3/26/16.
+ */
+class Vertex implements Comparable<Vertex>
+{
+    public final String name;
+    public Edge[] adjacencies;
+    public double minDistance = Double.POSITIVE_INFINITY;
+    public Vertex previous;
+    public Vertex(String argName) { name = argName; }
+    public String toString() { return name; }
+    public int compareTo(Vertex other)
+    {
+        return Double.compare(minDistance, other.minDistance);
+    }
+
+}
+
+
+class Edge
+{
+    public final Vertex target;
+    public final double weight;
+    public Edge(Vertex argTarget, double argWeight)
+    { target = argTarget; weight = argWeight; }
+}
+class Dijkstra {
+    public static void computePaths(Vertex source) {
+        source.minDistance = 0.;
+        PriorityQueue<Vertex> vertexQueue = new PriorityQueue<Vertex>();
+        vertexQueue.add(source);
+
+        while (!vertexQueue.isEmpty()) {
+            Vertex u = vertexQueue.poll();
+
+            // Visit each edge exiting u
+            for (Edge e : u.adjacencies) {
+                Vertex v = e.target;
+                double weight = e.weight;
+                double distanceThroughU = u.minDistance + weight;
+                if (distanceThroughU < v.minDistance) {
+                    vertexQueue.remove(v);
+
+                    v.minDistance = distanceThroughU;
+                    v.previous = u;
+                    vertexQueue.add(v);
+                }
+            }
+        }
+    }
+
+    public static List<Vertex> getShortestPathTo(Vertex target) {
+        List<Vertex> path = new ArrayList<Vertex>();
+        for (Vertex vertex = target; vertex != null; vertex = vertex.previous)
+            path.add(vertex);
+
+        Collections.reverse(path);
+        return path;
+    }
+
+    public static void shortestPath(String destn, String srcn) {
+        Main2Activity ob1 = new Main2Activity();
+        Vertex[] V =  new Vertex[20];
+        String s1,s2;
+        int i,j,loc,adjn,n1,n2,vr,des,src,flag=0;
+        Cursor d,e,f;
+        ob1.DBOpener();
+        Log.d("kuttan","vannuuuuu  "+destn);
+        loc=ob1.myDbHelper.noOfLocations();
+        des=ob1.myDbHelper.getBeaconid(destn);
+        src=ob1.myDbHelper.getBid(srcn);
+        d=ob1.myDbHelper.allLocation();
+        for(i=1;i<=loc;i++){
+            d.moveToPosition(i-1);
+            s1=d.getString(0);
+            Log.d("pottan","at location  "+s1);
+            V[i]= new Vertex(s1);
+        }
+        /*Vertex v0 = new Vertex("Harrisburg");
+        Vertex v1 = new Vertex("Baltimore");
+        Vertex v2 = new Vertex("Washington");
+        Vertex v3 = new Vertex("Philadelphia");
+        Vertex v4 = new Vertex("Binghamton");
+        Vertex v5 = new Vertex("Allentown");
+        Vertex v6 = new Vertex("New York");*/
+        for(i=1;i<=loc;i++) {
+            e=ob1.myDbHelper.adjacentToNode2(i);
+            f=ob1.myDbHelper.adjacentToNode1(i);
+            adjn=ob1.myDbHelper.noOfEdgesOfNode(i);
+            n2=e.getCount();
+            n1=f.getCount();
+            // V[i].adjacencies = new Edge[adjn];
+            /*
+            for(j=1;j<=n2;j++){
+                e.moveToPosition(j-1);
+                s2=e.getString(0);
+                Log.d("pottan","adjacent of  "+s2);
+                vr= Integer.parseInt(s2);
+                V[i].adjacencies= new Edge[]{new Edge(V[vr],70)};
+                // V[i].adjacencies
+            }
+            */
+            V[i].adjacencies= new Edge[n1];
+            for(j=1;j<=n1;j++){
+                f.moveToPosition(j-1);
+                s2=f.getString(0);
+                Log.d("pottan","adjacent of  "+s2);
+                vr= Integer.parseInt(s2);
+                V[i].adjacencies[j-1] = new  Edge(V[vr],70);
+
+            }
+
+        }
+
+        Vertex[] vertices = {V[des]};
+        /*
+        v1.adjacencies = new Edge[]{new Edge(v0, 79.75),
+                new Edge(v2, 39.42),
+                new Edge(v3, 103.00)};
+        v2.adjacencies = new Edge[]{new Edge(v1, 38.65)};
+        v3.adjacencies = new Edge[]{new Edge(v1, 102.53),
+                new Edge(v5, 61.44),
+                new Edge(v6, 96.79)};
+        v4.adjacencies = new Edge[]{new Edge(v5, 133.04)};
+        v5.adjacencies = new Edge[]{new Edge(v0, 81.77),
+                new Edge(v3, 62.05),
+                new Edge(v4, 134.47),
+                new Edge(v6, 91.63)};
+        v6.adjacencies = new Edge[]{new Edge(v3, 97.24),
+                new Edge(v5, 87.94)};*/
+
+
+        //Vertex[] vertices = {v0, v1, v2, v3, v4, v5, v6};
+
+        computePaths(V[src]);
+        for (Vertex v : vertices) {
+            System.out.println("Distance to " + v + ": " + v.minDistance);
+            List<Vertex> path = getShortestPathTo(v);
+            flag=flag+1;
+            if(flag==1)
+            {
+                Main2Activity.destnt=path.get(1).toString();
+                Log.d("test",Main2Activity.destnt);
+                /*
+                if(destn==Main2Activity.destnt ){
+
+                }
+                else {
+                    ob1.myDbHelper.direction(Main2Activity.destnt,srcn);
+                }
+                */
+            }
+                System.out.println("Path: " + path);
+        }
+    }
+
+
+
+}
